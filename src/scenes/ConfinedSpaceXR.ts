@@ -2,8 +2,12 @@ import * as THREE from 'three';
 import { VRButton } from 'three/examples/jsm/webxr/VRButton';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls';
+import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory';
 import { RadialMenu } from '../ui/RadialMenu';
 import { BasePanel } from '../ui/BasePanel';
+import { TextPanel } from '../ui/TextPanel';
+import { loadPDB, Atom, createBallStick, createSpaceFill, createWireframe, createTransparentSurface } from '../molecule/PDBLoader';
+import { LoadOverlay } from '../ui/LoadOverlay';
 
 export class ConfinedSpaceXR {
   private renderer!: THREE.WebGLRenderer;
@@ -14,15 +18,36 @@ export class ConfinedSpaceXR {
   private useOrbit = true;
   private menu!: RadialMenu;
   private clock = new THREE.Clock();
+  private menuVisible = true;
+  private loadOverlay!: LoadOverlay;
 
   // panels
   private helpPanel!: BasePanel;
   private settingsPanel!: BasePanel;
   private visPanel!: BasePanel;
+  private moleculeGroup?: THREE.Group;
+  private atoms?: Atom[];
+  private repIndex = 0;
+  // TODO queue (polish) -----------------------------------------------------
+  // 1. Re-measure bounding box after each representation switch to keep
+  //    scale consistent across modes.
+  // 2. Transparent-surface representation currently occludes radial menu;
+  //    set depthWrite = false and an appropriate renderOrder.
+  // ------------------------------------------------------------------------
+  private repBuilders = [createBallStick, createSpaceFill, createWireframe, createTransparentSurface];
+  private moleculeScale = 1;
+  private transitionOld?: THREE.Group;
+  private transitionNew?: THREE.Group;
+  private transitionProgress = 0;
 
   // pointer interaction
   private raycaster = new THREE.Raycaster();
   private mouse = new THREE.Vector2();
+  // vr controllers
+  private controllers: THREE.Group[] = [];
+
+  // movement keys
+  private keys = { forward: false, back: false, left: false, right: false };
 
   init() {
     this.scene = new THREE.Scene();
@@ -39,6 +64,8 @@ export class ConfinedSpaceXR {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.xr.enabled = true;
+
+    this.setupControllers();
     document.body.appendChild(this.renderer.domElement);
     document.body.appendChild(VRButton.createButton(this.renderer));
 
@@ -49,6 +76,36 @@ export class ConfinedSpaceXR {
     window.addEventListener('keydown', (e) => {
       if (e.key === 't') {
         this.toggleControls();
+      }
+      switch (e.code) {
+        case 'KeyW':
+          this.keys.forward = true;
+          break;
+        case 'KeyS':
+          this.keys.back = true;
+          break;
+        case 'KeyA':
+          this.keys.left = true;
+          break;
+        case 'KeyD':
+          this.keys.right = true;
+          break;
+      }
+    });
+    window.addEventListener('keyup', (e) => {
+      switch (e.code) {
+        case 'KeyW':
+          this.keys.forward = false;
+          break;
+        case 'KeyS':
+          this.keys.back = false;
+          break;
+        case 'KeyA':
+          this.keys.left = false;
+          break;
+        case 'KeyD':
+          this.keys.right = false;
+          break;
       }
     });
 
@@ -80,25 +137,59 @@ export class ConfinedSpaceXR {
     this.scene.add(this.menu.object3d);
 
     // panels (initially hidden)
-    this.helpPanel = new BasePanel();
+    this.helpPanel = new TextPanel([
+      'WebXR Molecule Viewer',
+      '',
+      'M  : toggle radial menu',
+      'T  : toggle orbit/walk',
+      'WASD: move (walk mode)',
+      'Mouse click: select menu item',
+      '',
+      'Use the Load menu to fetch a PDB',
+      'Use Visuals to change style',
+    ]);
     this.helpPanel.object3d.position.set(0, 1.6, -1.5);
     this.helpPanel.hide();
     this.scene.add(this.helpPanel.object3d);
 
-    this.settingsPanel = new BasePanel(undefined, undefined, 0x224466);
+    this.settingsPanel = new TextPanel([
+      'Settings (coming soon)',
+      '',
+      '- Orbit vs Walk: press T',
+      '- Menu opacity and scale TBD',
+    ]);
     this.settingsPanel.object3d.position.set(0, 1.6, -1.5);
     this.settingsPanel.hide();
     this.scene.add(this.settingsPanel.object3d);
 
-    this.visPanel = new BasePanel(undefined, undefined, 0x662244);
+    this.visPanel = new TextPanel([
+      'Visual Styles',
+      '',
+      '1  Ball-and-Stick',
+      '2  Space-Filling',
+      '3  Wireframe',
+      '4  Transparent Surface',
+      '',
+      'Click Visuals on menu to cycle',
+    ]);
     this.visPanel.object3d.position.set(0, 1.6, -1.5);
     this.visPanel.hide();
     this.scene.add(this.visPanel.object3d);
 
+    // HTML overlay for molecule loading
+    this.loadOverlay = new LoadOverlay();
+    this.loadOverlay.onLoad = (id) => this.loadPdbId(id);
+
+    // keyboard toggle for menu visibility
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyM') this.toggleMenu();
+    });
+
     // link menu actions
     this.menu.setAction('Help', () => this.togglePanel(this.helpPanel));
     this.menu.setAction('Settings', () => this.togglePanel(this.settingsPanel));
-    this.menu.setAction('Visuals', () => this.togglePanel(this.visPanel));
+    this.menu.setAction('Visuals', () => this.cycleRepresentation());
+    this.menu.setAction('Load', () => this.loadOverlay.show());
 
     // animate
     this.renderer.setAnimationLoop(() => this.animate());
@@ -108,11 +199,65 @@ export class ConfinedSpaceXR {
 
   private toggleControls() {
     this.useOrbit = !this.useOrbit;
+    this.orbit.enabled = this.useOrbit;
     if (this.useOrbit) {
       this.walk.unlock();
     } else {
+      // request pointer lock (requires user gesture; 'T' key press counts)
       this.walk.lock();
     }
+
+  }
+
+  private async loadPdbId(pdb: string) {
+    // TODO: validate input
+    try {
+      const { atoms, group } = await loadPDB(pdb.trim());
+      if (this.moleculeGroup) this.scene.remove(this.moleculeGroup);
+      this.moleculeGroup = group;
+      this.atoms = atoms;
+      this.repIndex = 0;
+      group.position.set(0, 1, 0); // atop pedestal
+      // auto-fit height to ~1 unit
+      const bbox = new THREE.Box3().setFromObject(group);
+      const height = bbox.max.y - bbox.min.y;
+      this.moleculeScale = height > 0 ? 1 / height : 1;
+      group.scale.set(this.moleculeScale, this.moleculeScale, this.moleculeScale);
+      this.scene.add(group);
+      alert(`Loaded ${pdb}`);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to load PDB');
+    }
+  }
+
+  private cycleRepresentation() {
+    if (!this.atoms) {
+      alert('Load a molecule first');
+      return;
+    }
+    this.repIndex = (this.repIndex + 1) % this.repBuilders.length;
+    // set up smooth transition
+    const builder = this.repBuilders[this.repIndex];
+    const newGroup = builder(this.atoms);
+    newGroup.position.set(0, 1, 0);
+    newGroup.scale.set(0.01 * this.moleculeScale, 0.01 * this.moleculeScale, 0.01 * this.moleculeScale);
+    this.scene.add(newGroup);
+    this.transitionOld = this.moleculeGroup;
+    this.transitionNew = newGroup;
+    this.transitionProgress = 0;
+    this.moleculeGroup = newGroup;
+  }
+
+  private placePanel(panel: BasePanel) {
+    // position panel a fixed distance in front of camera, facing the camera
+    const distance = 1.5;
+    const dir = new THREE.Vector3();
+    this.camera.getWorldDirection(dir);
+    const pos = this.camera.position.clone().add(dir.multiplyScalar(distance));
+    panel.object3d.position.copy(pos);
+    panel.object3d.lookAt(this.camera.position);
+
   }
 
   private togglePanel(panel: BasePanel) {
@@ -122,19 +267,91 @@ export class ConfinedSpaceXR {
     this.settingsPanel.hide();
     this.visPanel.hide();
     // show the desired one if it was closed
-    if (willOpen) panel.show();
+    if (willOpen) {
+      this.placePanel(panel);
+      panel.show();
+    }
+  }
+
+  private toggleMenu() {
+    this.menuVisible = !this.menuVisible;
+    this.menu.object3d.visible = this.menuVisible;
+  }
+
+  private setupControllers() {
+    const controllerModelFactory = new XRControllerModelFactory();
+    for (let i = 0; i < 2; i++) {
+      const controller = this.renderer.xr.getController(i);
+      controller.addEventListener('selectstart', () => {
+        if (this.menuVisible) this.menu.select();
+      });
+      const geometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, 0, -1),
+      ]);
+      const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 0xffff00 }));
+      line.name = 'ray';
+      line.scale.z = 5;
+      controller.add(line);
+      this.scene.add(controller);
+
+      const grip = this.renderer.xr.getControllerGrip(i);
+      grip.add(controllerModelFactory.createControllerModel(grip));
+      this.scene.add(grip);
+
+      this.controllers.push(controller);
+    }
   }
 
   private animate() {
     const delta = this.clock.getDelta();
-    this.menu.update(delta);
+    // update orbit controls if enabled
+    if (this.useOrbit) this.orbit.update();
 
-    // hover detection
-    this.raycaster.setFromCamera(this.mouse, this.camera);
-    this.menu.handlePointer(this.raycaster);
+    if (this.menuVisible) this.menu.update(delta);
+
+  // handle representation transition
+  if (this.transitionNew) {
+    const DURATION = 0.5;
+    this.transitionProgress += delta;
+    const t = Math.min(this.transitionProgress / DURATION, 1);
+    const scaleIn = THREE.MathUtils.lerp(0.01 * this.moleculeScale, this.moleculeScale, t);
+    const scaleOut = THREE.MathUtils.lerp(this.moleculeScale, 0.01 * this.moleculeScale, t);
+    this.transitionNew.scale.set(scaleIn, scaleIn, scaleIn);
+    if (this.transitionOld) this.transitionOld.scale.set(scaleOut, scaleOut, scaleOut);
+    if (t >= 1) {
+      if (this.transitionOld) {
+        this.scene.remove(this.transitionOld);
+      }
+      this.transitionOld = undefined;
+      this.transitionNew.scale.set(1, 1, 1);
+      this.transitionNew = undefined;
+    }
+  }
+
+    // hover detection only when menu visible
+    if (this.menuVisible) {
+      // mouse pointer
+      this.raycaster.setFromCamera(this.mouse, this.camera);
+      this.menu.handlePointer(this.raycaster);
+      // controller pointers (only when in XR)
+      if (this.renderer.xr.isPresenting) {
+        for (const ctrl of this.controllers) {
+          const origin = ctrl.position;
+          const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(ctrl.quaternion);
+          this.raycaster.ray.origin.copy(origin);
+          this.raycaster.ray.direction.copy(dir);
+          this.menu.handlePointer(this.raycaster);
+        }
+      }
+    }
 
     if (!this.useOrbit) {
-      // placeholder for future WASD processing
+      const speed = 3; // units per second
+      if (this.keys.forward) this.walk.moveForward(speed * delta);
+      if (this.keys.back) this.walk.moveForward(-speed * delta);
+      if (this.keys.left) this.walk.moveRight(-speed * delta);
+      if (this.keys.right) this.walk.moveRight(speed * delta);
     }
 
     this.renderer.render(this.scene, this.camera);

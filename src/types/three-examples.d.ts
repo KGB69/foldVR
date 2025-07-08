@@ -32,6 +32,8 @@ declare module 'three/examples/jsm/controls/PointerLockControls' {
     isLocked: boolean;
     lock(): void;
     unlock(): void;
+    moveForward(distance: number): void;
+    moveRight(distance: number): void;
     getObject(): Camera;
     getDirection(vector: Vector3): Vector3;
     dispose(): void;

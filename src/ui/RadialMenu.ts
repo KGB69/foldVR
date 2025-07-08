@@ -17,6 +17,7 @@ export class RadialMenu {
 
     this.addItem('Help', () => console.log('Help clicked'));
     this.addItem('Settings', () => console.log('Settings clicked'));
+    this.addItem('Load', () => console.log('Load clicked'));
     this.addItem('Visuals', () => console.log('Visuals clicked'));
 
     this.buildMesh();
@@ -36,8 +37,9 @@ export class RadialMenu {
     const segAngle = (2 * Math.PI) / this.items.length;
     for (let i = 0; i < this.items.length; i++) {
       const geom = new THREE.RingGeometry(radius * 0.7, radius, 32, 1, i * segAngle, segAngle);
-      const mat = new THREE.MeshBasicMaterial({ color: 0x2266aa, side: THREE.DoubleSide });
+      const mat = new THREE.MeshBasicMaterial({ color: 0x2266aa, side: THREE.DoubleSide, depthTest: false, depthWrite: false });
       const wedge = new THREE.Mesh(geom, mat);
+      wedge.renderOrder = 999;
       wedge.userData.index = i;
       this.wedges.push(wedge);
       this.object3d.add(wedge);
