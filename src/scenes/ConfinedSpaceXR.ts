@@ -394,10 +394,19 @@ export class ConfinedSpaceXR {
           const src = ctrl.userData.inputSource as XRInputSource | undefined;
           if (!src || !src.gamepad) continue;
           const axes = src.gamepad.axes;
-          const x = axes[0] || 0;
-          const y = axes[1] || 0;
-          const dead = 0.1;
-          if (Math.abs(x) < dead && Math.abs(y) < dead) continue;
+          // Quest may map left stick to indices 2/3
+          const x = axes.length >= 4 ? axes[2] : axes[0] || 0;
+          const y = axes.length >= 4 ? axes[3] : axes[1] || 0;
+          const dead = 0.05;
+          if (Math.abs(x) < dead && Math.abs(y) < dead) {
+            // still log occasionally to see axes values
+            this.debugTimer += delta;
+            if (this.debugTimer > 1) {
+              console.log(`axes zero-ish: [${axes.map(a=>a.toFixed(2)).join(', ')}]`);
+              this.debugTimer = 0;
+            }
+            continue;
+          }
 
           // build movement vectors
           dir.y = 0;
@@ -412,7 +421,7 @@ export class ConfinedSpaceXR {
           // debug log once per second
           this.debugTimer += delta;
           if (this.debugTimer > 1) {
-            console.log(`VR axes: ${x.toFixed(2)}, ${y.toFixed(2)}`);
+            console.log(`axes raw: [${axes.map(a=>a.toFixed(2)).join(', ')}] selected (${x.toFixed(2)}, ${y.toFixed(2)})`);
             this.debugTimer = 0;
           }
         }
