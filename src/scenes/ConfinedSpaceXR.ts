@@ -383,24 +383,31 @@ export class ConfinedSpaceXR {
 
     // VR locomotion via left controller thumbstick
     if (this.renderer.xr.isPresenting) {
-      const rig = this.userRig;
-        for (const ctrl of this.controllers) {
+      for (const ctrl of this.controllers) {
+        const origin = new THREE.Vector3();
+        ctrl.getWorldPosition(origin);
+        const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(ctrl.getWorldQuaternion(new THREE.Quaternion()));
+        this.raycaster.ray.origin.copy(origin);
+        this.raycaster.ray.direction.copy(dir);
+        this.menu.handlePointer(this.raycaster);
+          // read stick axes
           const src = ctrl.userData.inputSource as XRInputSource | undefined;
-          if (!src || src.handedness !== 'left' || !src.gamepad) continue;
+          if (!src || !src.gamepad) continue;
           const axes = src.gamepad.axes;
           const x = axes[0] || 0;
           const y = axes[1] || 0;
           const dead = 0.1;
           if (Math.abs(x) < dead && Math.abs(y) < dead) continue;
-          const move = new THREE.Vector3();
-          // forward relative to camera yaw
-          const dir = new THREE.Vector3();
-          this.camera.getWorldDirection(dir);
-          dir.y = 0; dir.normalize();
+
+          // build movement vectors
+          dir.y = 0;
+          dir.normalize();
           const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0,1,0)).normalize();
-          move.addScaledVector(dir, -y * this.vrSpeed * delta);
-          move.addScaledVector(right, x * this.vrSpeed * delta);
-          rig.position.add(move);
+          const move = new THREE.Vector3()
+            .addScaledVector(dir, -y * this.vrSpeed * delta)
+            .addScaledVector(right, x * this.vrSpeed * delta);
+
+          this.userRig.position.add(move);
 
           // debug log once per second
           this.debugTimer += delta;
