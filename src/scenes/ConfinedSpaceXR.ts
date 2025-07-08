@@ -45,6 +45,7 @@ export class ConfinedSpaceXR {
   private mouse = new THREE.Vector2();
   // vr controllers
   private controllers: THREE.Group[] = [];
+  private vrSpeed = 2; // meters per second
 
   // movement keys
   private keys = { forward: false, back: false, left: false, right: false };
@@ -284,6 +285,17 @@ export class ConfinedSpaceXR {
       const controller = this.renderer.xr.getController(i);
       controller.addEventListener('selectstart', () => {
         if (this.menuVisible) this.menu.select();
+        // haptic pulse
+        const input = (controller as any).inputSource as XRInputSource | undefined;
+        const gamepad = input?.gamepad;
+        const haptic = gamepad?.hapticActuators?.[0];
+        haptic?.pulse?.(0.5, 100);
+      });
+      controller.addEventListener('connected', (event: any) => {
+        controller.userData.inputSource = event.data;
+      });
+      controller.addEventListener('disconnected', () => {
+        delete controller.userData.inputSource;
       });
       const geometry = new THREE.BufferGeometry().setFromPoints([
         new THREE.Vector3(0, 0, 0),
@@ -352,6 +364,29 @@ export class ConfinedSpaceXR {
       if (this.keys.back) this.walk.moveForward(-speed * delta);
       if (this.keys.left) this.walk.moveRight(-speed * delta);
       if (this.keys.right) this.walk.moveRight(speed * delta);
+    }
+
+    // VR locomotion via left controller thumbstick
+    if (this.renderer.xr.isPresenting) {
+      const rig = this.camera.parent as THREE.Object3D;
+      if (rig) {
+        for (const ctrl of this.controllers) {
+          const src = ctrl.userData.inputSource as XRInputSource | undefined;
+          if (!src || src.handedness !== 'left' || !src.gamepad) continue;
+          const axes = src.gamepad.axes;
+          const x = axes[2] ?? axes[0] ?? 0;
+          const y = axes[3] ?? axes[1] ?? 0;
+          const move = new THREE.Vector3();
+          // forward relative to camera yaw
+          const dir = new THREE.Vector3();
+          this.camera.getWorldDirection(dir);
+          dir.y = 0; dir.normalize();
+          const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0,1,0)).normalize();
+          move.addScaledVector(dir, -y * this.vrSpeed * delta);
+          move.addScaledVector(right, x * this.vrSpeed * delta);
+          rig.position.add(move);
+        }
+      }
     }
 
     this.renderer.render(this.scene, this.camera);
