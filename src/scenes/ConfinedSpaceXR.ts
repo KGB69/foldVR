@@ -186,6 +186,12 @@ export class ConfinedSpaceXR {
     this.visPanel.hide();
     this.scene.add(this.visPanel.object3d);
 
+    // quick load panel with preset PDB IDs
+    this.quickLoad = new QuickLoadPanel(['1CRN','2POR','5PTI','4HHB','1A4W']);
+    this.quickLoad.hide();
+    this.quickLoad.onSelect = (id:string)=>{ this.loadPdbId(id); this.quickLoad.hide(); };
+    this.scene.add(this.quickLoad.object3d);
+
     // HTML overlay for molecule loading
     this.loadOverlay = new LoadOverlay();
     this.loadOverlay.onLoad = (id) => this.loadPdbId(id);
@@ -277,17 +283,30 @@ export class ConfinedSpaceXR {
   }
 
   private togglePanel(panel: BasePanel) {
+  const isQuick = panel === this.quickLoad;
     const willOpen = !panel.object3d.visible;
     // hide all panels first
     this.helpPanel.hide();
     this.settingsPanel.hide();
     this.visPanel.hide();
+    if (this.quickLoad) this.quickLoad.hide();
     // show the desired one if it was closed
     if (willOpen) {
+    // if opening quick load, hide the radial menu so it doesn't block pointer
+    if (isQuick) {
+      this.menuVisible = false;
+      this.menu.object3d.visible = false;
+    }
       this.placePanel(panel);
       panel.show();
+  } else {
+    // if closing quick load, restore the radial menu visibility that we hid when opening it
+    if (isQuick) {
+      this.menuVisible = true;
+      this.menu.object3d.visible = true;
     }
   }
+}
 
   private toggleMenu() {
     this.menuVisible = !this.menuVisible;
@@ -299,9 +318,10 @@ export class ConfinedSpaceXR {
     for (let i = 0; i < 2; i++) {
       const controller = this.renderer.xr.getController(i);
       controller.addEventListener('selectstart', () => {
-        if (this.menuVisible) {
-        if(this.quickLoad.object3d.visible) this.quickLoad.select();
-        else this.menu.select();
+        if (this.quickLoad.object3d.visible) {
+        this.quickLoad.select();
+      } else if (this.menuVisible) {
+        this.menu.select();
       }
         // haptic pulse
         const input = (controller as any).inputSource as XRInputSource | undefined;
@@ -364,6 +384,9 @@ export class ConfinedSpaceXR {
       // mouse pointer
       this.raycaster.setFromCamera(this.mouse, this.camera);
       this.menu.handlePointer(this.raycaster);
+      if (this.quickLoad && this.quickLoad.object3d.visible) {
+        this.quickLoad.handlePointer(this.raycaster);
+      }
       // controller pointers (only when in XR)
       if (this.renderer.xr.isPresenting) {
         for (const ctrl of this.controllers) {
@@ -373,6 +396,9 @@ export class ConfinedSpaceXR {
           this.raycaster.ray.origin.copy(origin);
           this.raycaster.ray.direction.copy(dir);
           this.menu.handlePointer(this.raycaster);
+      if (this.quickLoad && this.quickLoad.object3d.visible) {
+        this.quickLoad.handlePointer(this.raycaster);
+      }
         }
       }
     }
@@ -394,6 +420,9 @@ export class ConfinedSpaceXR {
         this.raycaster.ray.origin.copy(origin);
         this.raycaster.ray.direction.copy(dir);
         this.menu.handlePointer(this.raycaster);
+      if (this.quickLoad && this.quickLoad.object3d.visible) {
+        this.quickLoad.handlePointer(this.raycaster);
+      }
           // read stick axes
           const src = ctrl.userData.inputSource as XRInputSource | undefined;
           if (!src || !src.gamepad) continue;
