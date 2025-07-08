@@ -6,6 +6,7 @@ import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerM
 import { RadialMenu } from '../ui/RadialMenu';
 import { BasePanel } from '../ui/BasePanel';
 import { TextPanel } from '../ui/TextPanel';
+import { QuickLoadPanel } from '../ui/QuickLoadPanel';
 import { loadPDB, Atom, createBallStick, createSpaceFill, createWireframe, createTransparentSurface } from '../molecule/PDBLoader';
 import { LoadOverlay } from '../ui/LoadOverlay';
 
@@ -25,6 +26,7 @@ export class ConfinedSpaceXR {
   private helpPanel!: BasePanel;
   private settingsPanel!: BasePanel;
   private visPanel!: BasePanel;
+  private quickLoad!: QuickLoadPanel;
   private moleculeGroup?: THREE.Group;
   private atoms?: Atom[];
   private repIndex = 0;
@@ -199,8 +201,7 @@ export class ConfinedSpaceXR {
     this.menu.setAction('Visuals', () => this.cycleRepresentation());
     this.menu.setAction('Load', () => {
       if (this.renderer.xr.isPresenting) {
-        this.renderer.xr.getSession()?.end();
-        setTimeout(() => this.loadOverlay.show(), 200);
+        this.togglePanel(this.quickLoad);
       } else {
         this.loadOverlay.show();
       }
@@ -298,7 +299,10 @@ export class ConfinedSpaceXR {
     for (let i = 0; i < 2; i++) {
       const controller = this.renderer.xr.getController(i);
       controller.addEventListener('selectstart', () => {
-        if (this.menuVisible) this.menu.select();
+        if (this.menuVisible) {
+        if(this.quickLoad.object3d.visible) this.quickLoad.select();
+        else this.menu.select();
+      }
         // haptic pulse
         const input = (controller as any).inputSource as XRInputSource | undefined;
         const gamepad = input?.gamepad;
