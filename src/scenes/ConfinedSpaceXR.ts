@@ -46,6 +46,7 @@ export class ConfinedSpaceXR {
   // vr controllers
   private controllers: THREE.Group[] = [];
   private vrSpeed = 2; // meters per second
+  private userRig!: THREE.Group;
 
   // movement keys
   private keys = { forward: false, back: false, left: false, right: false };
@@ -61,6 +62,11 @@ export class ConfinedSpaceXR {
       100
     );
     this.camera.position.set(0, 1.6, 3);
+
+    // user rig to allow locomotion in XR
+    this.userRig = new THREE.Group();
+    this.userRig.add(this.camera);
+    this.scene.add(this.userRig);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -190,7 +196,14 @@ export class ConfinedSpaceXR {
     this.menu.setAction('Help', () => this.togglePanel(this.helpPanel));
     this.menu.setAction('Settings', () => this.togglePanel(this.settingsPanel));
     this.menu.setAction('Visuals', () => this.cycleRepresentation());
-    this.menu.setAction('Load', () => this.loadOverlay.show());
+    this.menu.setAction('Load', () => {
+      if (this.renderer.xr.isPresenting) {
+        this.renderer.xr.getSession()?.end();
+        setTimeout(() => this.loadOverlay.show(), 200);
+      } else {
+        this.loadOverlay.show();
+      }
+    });
 
     // animate
     this.renderer.setAnimationLoop(() => this.animate());
@@ -305,11 +318,11 @@ export class ConfinedSpaceXR {
       line.name = 'ray';
       line.scale.z = 5;
       controller.add(line);
-      this.scene.add(controller);
+      this.userRig.add(controller);
 
       const grip = this.renderer.xr.getControllerGrip(i);
       grip.add(controllerModelFactory.createControllerModel(grip));
-      this.scene.add(grip);
+      this.userRig.add(grip);
 
       this.controllers.push(controller);
     }
@@ -349,8 +362,9 @@ export class ConfinedSpaceXR {
       // controller pointers (only when in XR)
       if (this.renderer.xr.isPresenting) {
         for (const ctrl of this.controllers) {
-          const origin = ctrl.position;
-          const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(ctrl.quaternion);
+          const origin = new THREE.Vector3();
+          ctrl.getWorldPosition(origin);
+          const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(ctrl.getWorldQuaternion(new THREE.Quaternion()));
           this.raycaster.ray.origin.copy(origin);
           this.raycaster.ray.direction.copy(dir);
           this.menu.handlePointer(this.raycaster);
@@ -368,14 +382,13 @@ export class ConfinedSpaceXR {
 
     // VR locomotion via left controller thumbstick
     if (this.renderer.xr.isPresenting) {
-      const rig = this.camera.parent as THREE.Object3D;
-      if (rig) {
+      const rig = this.userRig;
         for (const ctrl of this.controllers) {
           const src = ctrl.userData.inputSource as XRInputSource | undefined;
           if (!src || src.handedness !== 'left' || !src.gamepad) continue;
           const axes = src.gamepad.axes;
-          const x = axes[2] ?? axes[0] ?? 0;
-          const y = axes[3] ?? axes[1] ?? 0;
+          const x = axes[0] || 0;
+          const y = axes[1] || 0;
           const move = new THREE.Vector3();
           // forward relative to camera yaw
           const dir = new THREE.Vector3();
@@ -387,8 +400,6 @@ export class ConfinedSpaceXR {
           rig.position.add(move);
         }
       }
-    }
-
     this.renderer.render(this.scene, this.camera);
   }
 
