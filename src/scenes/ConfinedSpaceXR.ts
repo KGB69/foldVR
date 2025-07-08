@@ -45,7 +45,8 @@ export class ConfinedSpaceXR {
   private mouse = new THREE.Vector2();
   // vr controllers
   private controllers: THREE.Group[] = [];
-  private vrSpeed = 2; // meters per second
+  private vrSpeed = 5; // meters per second
+  private debugTimer = 0;
   private userRig!: THREE.Group;
 
   // movement keys
@@ -389,6 +390,8 @@ export class ConfinedSpaceXR {
           const axes = src.gamepad.axes;
           const x = axes[0] || 0;
           const y = axes[1] || 0;
+          const dead = 0.1;
+          if (Math.abs(x) < dead && Math.abs(y) < dead) continue;
           const move = new THREE.Vector3();
           // forward relative to camera yaw
           const dir = new THREE.Vector3();
@@ -398,6 +401,13 @@ export class ConfinedSpaceXR {
           move.addScaledVector(dir, -y * this.vrSpeed * delta);
           move.addScaledVector(right, x * this.vrSpeed * delta);
           rig.position.add(move);
+
+          // debug log once per second
+          this.debugTimer += delta;
+          if (this.debugTimer > 1) {
+            console.log(`VR axes: ${x.toFixed(2)}, ${y.toFixed(2)}`);
+            this.debugTimer = 0;
+          }
         }
       }
     this.renderer.render(this.scene, this.camera);
