@@ -1,0 +1,22 @@
+{
+  "name": "webxr-molecule-viewer",
+  "version": "0.1.0",
+  "description": "Immersive molecular visualization in WebXR",
+  "scripts": {
+    "dev": "webpack serve --mode development --open",
+    "build": "webpack --mode production"
+  },
+  "dependencies": {
+    "molstar": "^3.2.0",
+    "three": "^0.168.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.178.0",
+    "html-webpack-plugin": "^5.5.3",
+    "ts-loader": "^9.5.0",
+    "typescript": "^5.4.0",
+    "webpack": "^5.91.0",
+    "webpack-cli": "^5.1.0",
+    "webpack-dev-server": "^4.15.0"
+  }
+}
