@@ -246,16 +246,16 @@ export class ConfinedSpaceXR {
       this.moleculeScale = height > 0 ? 1 / height : 1;
       group.scale.set(this.moleculeScale, this.moleculeScale, this.moleculeScale);
       this.scene.add(group);
-      alert(`Loaded ${pdb}`);
+      console.log(`Loaded ${pdb}`);
     } catch (err) {
       console.error(err);
-      alert('Failed to load PDB');
+      console.warn('Failed to load PDB');
     }
   }
 
   private cycleRepresentation() {
     if (!this.atoms) {
-      alert('Load a molecule first');
+      console.warn('Load a molecule first');
       return;
     }
     this.repIndex = (this.repIndex + 1) % this.repBuilders.length;
@@ -319,10 +319,13 @@ export class ConfinedSpaceXR {
       const controller = this.renderer.xr.getController(i);
       controller.addEventListener('selectstart', () => {
         if (this.quickLoad.object3d.visible) {
-        this.quickLoad.select();
-      } else if (this.menuVisible) {
-        this.menu.select();
-      }
+          // perform selection and then restore radial menu visibility
+          this.quickLoad.select();
+          this.menuVisible = true;
+          this.menu.object3d.visible = true;
+        } else if (this.menuVisible) {
+          this.menu.select();
+        }
         // haptic pulse
         const input = (controller as any).inputSource as XRInputSource | undefined;
         const gamepad = input?.gamepad;
