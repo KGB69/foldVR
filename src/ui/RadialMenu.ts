@@ -9,6 +9,7 @@ export class RadialMenu {
   object3d: THREE.Group;
   private items: MenuItem[] = [];
   private hoverIndex = -1;
+  private sprites: THREE.Sprite[] = [];
   private wedges: THREE.Mesh[] = [];
 
   constructor() {
@@ -64,6 +65,7 @@ export class RadialMenu {
       sprite.scale.set(scale, scale * 0.5, 1);
       sprite.renderOrder = 1000;
       this.object3d.add(sprite);
+      this.sprites.push(sprite);
     }
   }
 
@@ -84,7 +86,7 @@ export class RadialMenu {
     }
   }
 
-  private setHover(index: number) {
+  public setHover(index: number) {
     if (this.hoverIndex === index) return;
     // reset previous
     if (this.hoverIndex !== -1) {
@@ -94,6 +96,24 @@ export class RadialMenu {
     if (this.hoverIndex !== -1) {
       (this.wedges[this.hoverIndex].material as THREE.MeshBasicMaterial).color.set(0xffaa00);
     }
+  }
+
+  setOpacity(op: number) {
+    op = THREE.MathUtils.clamp(op, 0, 1);
+    for (const wedge of this.wedges) {
+      const mat = wedge.material as THREE.MeshBasicMaterial;
+      mat.transparent = op < 1;
+      mat.opacity = op;
+    }
+    for (const spr of this.sprites) {
+      const mat = spr.material as THREE.SpriteMaterial;
+      mat.transparent = op < 1;
+      mat.opacity = op;
+    }
+  }
+
+  getItemCount() {
+    return this.items.length;
   }
 
   select() {

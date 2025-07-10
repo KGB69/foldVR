@@ -27,6 +27,9 @@ export class ConfinedSpaceXR {
   private settingsPanel!: BasePanel;
   private visPanel!: BasePanel;
   private quickLoad!: QuickLoadPanel;
+  // left-hand references for "watch" radial menu
+  private leftController?: THREE.Object3D;
+  private leftGrip?: THREE.Object3D;
   private moleculeGroup?: THREE.Group;
   private atoms?: Atom[];
   private repIndex = 0;
@@ -148,8 +151,8 @@ export class ConfinedSpaceXR {
     if (this.menu.object3d.parent) {
       this.menu.object3d.parent.remove(this.menu.object3d);
     }
-    this.menu.object3d.position.set(0, 1.4, -1.5);
-    this.userRig.add(this.menu.object3d);
+    this.menu.object3d.position.set(0, 0.07, -0.10); // default offset when anchored to wrist
+    this.userRig.add(this.menu.object3d); // temporary parent until left grip detected
 
     // panels (initially hidden)
     this.helpPanel = new TextPanel([
@@ -313,9 +316,11 @@ export class ConfinedSpaceXR {
   }
 }
 
+  // keyboard toggle kept for desktop testing; does not affect wrist logic
   private toggleMenu() {
     this.menuVisible = !this.menuVisible;
     this.menu.object3d.visible = this.menuVisible;
+    this.menu.setOpacity(this.menuVisible ? 1 : 0);
   }
 
   private setupControllers() {
@@ -339,7 +344,35 @@ export class ConfinedSpaceXR {
       });
       controller.addEventListener('connected', (event: any) => {
         controller.userData.inputSource = event.data;
+        // set left references & re-parent menu when first left controller connects
+        if (event.data.handedness === 'left') {
+          this.leftController = controller;
+          this.leftGrip = grip;
+          // move menu to wrist
+          if (this.menu.object3d.parent) this.menu.object3d.parent.remove(this.menu.object3d);
+          this.leftGrip.add(this.menu.object3d);
+          this.menu.object3d.position.set(0, 0.07, -0.10);
+          this.menu.object3d.visible = false;
+          this.menu.setOpacity(0);
+          this.menuVisible = false;
+        }
       });
+      // wrist-watch style show/hide using grip squeeze
+      controller.addEventListener('squeezestart', () => {
+        if (controller === this.leftController) {
+          this.menuVisible = true;
+          this.menu.object3d.visible = true;
+          this.menu.setOpacity(1);
+        }
+      });
+      controller.addEventListener('squeezeend', () => {
+        if (controller === this.leftController) {
+          this.menuVisible = false;
+          this.menu.object3d.visible = false;
+          this.menu.setOpacity(0);
+        }
+      });
+
       controller.addEventListener('disconnected', () => {
         delete controller.userData.inputSource;
       });
@@ -367,10 +400,10 @@ export class ConfinedSpaceXR {
     if (this.useOrbit) this.orbit.update();
 
     if (this.menuVisible) {
-    this.menu.update(delta);
-    // keep menu facing the user head orientation
+      this.menu.update(delta);
+    }
+    // keep menu facing head each frame even if hidden so orientation is ready when shown
     this.menu.object3d.lookAt(this.camera.position);
-  }
 
   // handle representation transition
   if (this.transitionNew) {
@@ -443,6 +476,22 @@ export class ConfinedSpaceXR {
           const x = axes.length >= 4 ? axes[2] : axes[0] || 0;
           const y = axes.length >= 4 ? axes[3] : axes[1] || 0;
           const dead = 0.05;
+
+          // thumbstick hover for radial menu (left controller only)
+          if (this.menuVisible && ctrl === this.leftController) {
+            const radius = Math.hypot(x, y);
+            if (radius > dead) {
+              const angle = Math.atan2(x, y); // 0 rad at stick up, increasing clockwise
+              const count = this.menu.getItemCount();
+              const seg = (2 * Math.PI) / count;
+              const norm = (angle + 2 * Math.PI) % (2 * Math.PI);
+              const idx = Math.floor(norm / seg);
+              this.menu.setHover(idx);
+            } else {
+              this.menu.setHover(-1);
+            }
+          }
+
           if (Math.abs(x) < dead && Math.abs(y) < dead) {
             // still log occasionally to see axes values
             this.debugTimer += delta;
