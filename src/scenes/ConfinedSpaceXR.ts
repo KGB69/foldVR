@@ -142,9 +142,14 @@ export class ConfinedSpaceXR {
     pedestal.position.y = 0.1;
     this.scene.add(pedestal);
 
-    // menu
+    // menu – attach to user rig so it follows the player
     this.menu = new RadialMenu();
-    this.scene.add(this.menu.object3d);
+    // Remove from previous parent if any (safety)
+    if (this.menu.object3d.parent) {
+      this.menu.object3d.parent.remove(this.menu.object3d);
+    }
+    this.menu.object3d.position.set(0, 1.4, -1.5);
+    this.userRig.add(this.menu.object3d);
 
     // panels (initially hidden)
     this.helpPanel = new TextPanel([
@@ -361,7 +366,11 @@ export class ConfinedSpaceXR {
     // update orbit controls if enabled
     if (this.useOrbit) this.orbit.update();
 
-    if (this.menuVisible) this.menu.update(delta);
+    if (this.menuVisible) {
+    this.menu.update(delta);
+    // keep menu facing the user head orientation
+    this.menu.object3d.lookAt(this.camera.position);
+  }
 
   // handle representation transition
   if (this.transitionNew) {

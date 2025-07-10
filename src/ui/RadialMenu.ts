@@ -43,11 +43,32 @@ export class RadialMenu {
       wedge.userData.index = i;
       this.wedges.push(wedge);
       this.object3d.add(wedge);
+
+      // label sprite
+      const mid = i * segAngle + segAngle / 2;
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d')!;
+      ctx.fillStyle = '#fff';
+      ctx.font = '28px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(this.items[i].label, canvas.width / 2, canvas.height / 2);
+      const tex = new THREE.CanvasTexture(canvas);
+      const spriteMat = new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false });
+      const sprite = new THREE.Sprite(spriteMat);
+      const dist = radius * 0.55;
+      sprite.position.set(Math.sin(mid) * dist, 0.001, Math.cos(mid) * dist); // slight offset to avoid z-fight
+      const scale = 0.25;
+      sprite.scale.set(scale, scale * 0.5, 1);
+      sprite.renderOrder = 1000;
+      this.object3d.add(sprite);
     }
   }
 
   update(_delta: number) {
-    this.object3d.rotation.y += 0.3 * _delta; // slow spin for now
+    // no spin; leave static – facing is handled by parent/lookAt.
   }
 
   /**
