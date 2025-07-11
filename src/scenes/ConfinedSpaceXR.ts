@@ -147,6 +147,8 @@ export class ConfinedSpaceXR {
 
     // menu – attach to user rig so it follows the player
     this.menu = new RadialMenu();
+    // Scale radial menu down slightly for less intrusive size
+    this.menu.object3d.scale.setScalar(0.8);
     // Remove from previous parent if any (safety)
     if (this.menu.object3d.parent) {
       this.menu.object3d.parent.remove(this.menu.object3d);
@@ -236,7 +238,6 @@ export class ConfinedSpaceXR {
       // request pointer lock (requires user gesture; 'T' key press counts)
       this.walk.lock();
     }
-
   }
 
   private async loadPdbId(pdb: string) {
@@ -402,27 +403,25 @@ export class ConfinedSpaceXR {
     if (this.menuVisible) {
       this.menu.update(delta);
     }
-    // keep menu facing head each frame even if hidden so orientation is ready when shown
-    this.menu.object3d.lookAt(this.camera.position);
+    // Disabled automatic facing to avoid disorienting yaw spin while moving
+    // this.menu.object3d.lookAt(this.camera.position);
 
-  // handle representation transition
-  if (this.transitionNew) {
-    const DURATION = 0.5;
-    this.transitionProgress += delta;
-    const t = Math.min(this.transitionProgress / DURATION, 1);
-    const scaleIn = THREE.MathUtils.lerp(0.01 * this.moleculeScale, this.moleculeScale, t);
-    const scaleOut = THREE.MathUtils.lerp(this.moleculeScale, 0.01 * this.moleculeScale, t);
-    this.transitionNew.scale.set(scaleIn, scaleIn, scaleIn);
-    if (this.transitionOld) this.transitionOld.scale.set(scaleOut, scaleOut, scaleOut);
-    if (t >= 1) {
-      if (this.transitionOld) {
-        this.scene.remove(this.transitionOld);
+    // handle representation transition
+    if (this.transitionNew) {
+      const DURATION = 0.5;
+      this.transitionProgress += delta;
+      const t = Math.min(this.transitionProgress / DURATION, 1);
+      const scaleIn = THREE.MathUtils.lerp(0.01 * this.moleculeScale, this.moleculeScale, t);
+      const scaleOut = THREE.MathUtils.lerp(this.moleculeScale, 0.01 * this.moleculeScale, t);
+      this.transitionNew.scale.set(scaleIn, scaleIn, scaleIn);
+      if (this.transitionOld) this.transitionOld.scale.set(scaleOut, scaleOut, scaleOut);
+      if (t >= 1) {
+        if (this.transitionOld) this.scene.remove(this.transitionOld);
+        this.transitionOld = undefined;
+        this.transitionNew.scale.set(1, 1, 1);
+        this.transitionNew = undefined;
       }
-      this.transitionOld = undefined;
-      this.transitionNew.scale.set(1, 1, 1);
-      this.transitionNew = undefined;
     }
-  }
 
     // hover detection only when menu visible
     if (this.menuVisible) {
