@@ -137,6 +137,34 @@ export function createWireframe(atoms: Atom[]): THREE.Group {
   return group;
 }
 
+// ---------------- Ribbon / Cartoon representation ----------------
+export function createRibbon(atoms: Atom[]): THREE.Group {
+  // Approximate ribbon using a smooth tube through sampled atom positions (backbone).
+  const group = new THREE.Group();
+  if (atoms.length < 2) {
+    return group;
+  }
+
+  // Downsample to keep geometry complexity manageable.
+  const sampleStep = Math.max(1, Math.floor(atoms.length / 300));
+  const points: THREE.Vector3[] = [];
+  for (let i = 0; i < atoms.length; i += sampleStep) {
+    const a = atoms[i];
+    points.push(new THREE.Vector3(a.x, a.y, a.z));
+  }
+  // Ensure last atom included so ribbon reaches molecule end
+  const last = atoms[atoms.length - 1];
+  points.push(new THREE.Vector3(last.x, last.y, last.z));
+
+  const curve = new THREE.CatmullRomCurve3(points, false, 'centripetal');
+  const tubularSegments = Math.min(points.length * 3, 1000);
+  const tubeGeom = new THREE.TubeGeometry(curve, tubularSegments, 0.2, 8, false);
+  const material = new THREE.MeshStandardMaterial({ color: 0x00ccff, side: THREE.DoubleSide });
+  const mesh = new THREE.Mesh(tubeGeom, material);
+  group.add(mesh);
+  return group;
+}
+
 export function createTransparentSurface(atoms: Atom[]): THREE.Group {
   if (atoms.length > 2000) {
     // fallback to wireframe for large structures to avoid GPU overload

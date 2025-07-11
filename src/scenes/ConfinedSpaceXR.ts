@@ -6,7 +6,7 @@ import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerM
 import { RadialMenu } from '../ui/RadialMenu';
 import { QuickLoadPanel } from '../ui/QuickLoadPanel';
 import { UIPanelManager } from '../ui/UIPanelManager';
-import { loadPDB, Atom, createBallStick, createSpaceFill, createWireframe, createTransparentSurface } from '../molecule/PDBLoader';
+import { loadPDB, Atom, createBallStick, createSpaceFill, createWireframe, createTransparentSurface, createRibbon } from '../molecule/PDBLoader';
 import { LoadOverlay } from '../ui/LoadOverlay';
 
 export class ConfinedSpaceXR {
@@ -37,7 +37,7 @@ export class ConfinedSpaceXR {
   // 2. Transparent-surface representation currently occludes radial menu;
   //    set depthWrite = false and an appropriate renderOrder.
   // ------------------------------------------------------------------------
-  private repBuilders = [createBallStick, createSpaceFill, createWireframe, createTransparentSurface];
+  private repBuilders = [createBallStick, createSpaceFill, createWireframe, createTransparentSurface, createRibbon];
   private moleculeScale = 1;
   private transitionOld?: THREE.Group;
   private transitionNew?: THREE.Group;

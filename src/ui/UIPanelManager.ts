@@ -63,6 +63,7 @@ export class UIPanelManager {
       '2  Space-Filling',
       '3  Wireframe',
       '4  Transparent Surface',
+      '5  Ribbon/Cartoon',
       '',
       'Click Visuals on menu to cycle',
     ]);
