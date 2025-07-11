@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import { BasePanel } from './BasePanel';
 import { TextPanel } from './TextPanel';
 import { QuickLoadPanel } from './QuickLoadPanel';
+import { PdbInputPanel } from './PdbInputPanel';
 
-export type PanelId = 'help' | 'settings' | 'visuals' | 'quickLoad';
+export type PanelId = 'help' | 'settings' | 'visuals' | 'quickLoad' | 'pdbInput';
 
 /**
  * Centralised helper that owns all overlay UI panels (help, settings, visuals, quick-load).
@@ -19,6 +20,7 @@ export class UIPanelManager {
   private settingsPanel: TextPanel;
   private visPanel: TextPanel;
   private quickLoad: QuickLoadPanel;
+  private pdbInput: PdbInputPanel;
 
   // expose quick-load select externally
   public onQuickLoadSelect: (id: string) => void = () => {};
@@ -65,11 +67,15 @@ export class UIPanelManager {
       'Click Visuals on menu to cycle',
     ]);
 
-    this.quickLoad = new QuickLoadPanel(['1CRN', '2POR', '5PTI', '4HHB', '1A4W']);
+    // Pre-curated small-ish proteins to avoid heavy GPU load
+    this.quickLoad = new QuickLoadPanel(['1CRN', '1UBQ', '2PTL', '1STP', '2F4B']);
     this.quickLoad.onSelect = (id: string) => this.onQuickLoadSelect(id);
 
+    this.pdbInput = new PdbInputPanel();
+    this.pdbInput.onLoad = (id: string) => this.onQuickLoadSelect(id);
+
     // add to scene & hide by default
-    [this.helpPanel, this.settingsPanel, this.visPanel, this.quickLoad].forEach(p => {
+    [this.helpPanel, this.settingsPanel, this.visPanel, this.quickLoad, this.pdbInput].forEach(p => {
       p.hide();
       this.scene.add(p.object3d);
     });
@@ -81,7 +87,7 @@ export class UIPanelManager {
     const willOpen = !panel.object3d.visible;
 
     // hide all
-    [this.helpPanel, this.settingsPanel, this.visPanel, this.quickLoad].forEach(p => p.hide());
+    [this.helpPanel, this.settingsPanel, this.visPanel, this.quickLoad, this.pdbInput].forEach(p => p.hide());
 
     if (willOpen) {
       this.placePanel(panel);
@@ -92,22 +98,38 @@ export class UIPanelManager {
 
   /** Call once per frame to keep any visible panel in front of the user. */
   update() {
-    [this.helpPanel, this.settingsPanel, this.visPanel, this.quickLoad].forEach(p => {
+    [this.helpPanel, this.settingsPanel, this.visPanel, this.quickLoad, this.pdbInput].forEach(p => {
       if (p.object3d.visible) this.placePanel(p);
     });
   }
 
   /** Forward pointer ray to whichever panel is visible (for close btn & hover). */
   handlePointer(raycaster: THREE.Raycaster) {
-    [this.helpPanel, this.settingsPanel, this.visPanel, this.quickLoad].forEach(p => {
+    [this.helpPanel, this.settingsPanel, this.visPanel, this.quickLoad, this.pdbInput].forEach(p => {
       if (p.object3d.visible && (p as any).handlePointer) {
         (p as any).handlePointer(raycaster);
       }
     });
   }
 
+  /** Called on controller select to let any open panel react (e.g., close). Returns true if a panel handled the click. */
+  handleSelect(): boolean {
+    let consumed = false;
+    [this.helpPanel, this.settingsPanel, this.visPanel, this.quickLoad, this.pdbInput].forEach(p => {
+      if (p.object3d.visible && (p as any).select) {
+        const res = (p as any).select();
+        consumed = consumed || !!res;
+      }
+    });
+    return consumed;
+  }
+
   getQuickLoadPanel(): QuickLoadPanel {
     return this.quickLoad;
+  }
+
+  getPdbInputPanel(): PdbInputPanel {
+    return this.pdbInput;
   }
 
   /* -------------------- internals -------------------- */
@@ -117,6 +139,7 @@ export class UIPanelManager {
       case 'settings': return this.settingsPanel;
       case 'visuals': return this.visPanel;
       case 'quickLoad': return this.quickLoad;
+      case 'pdbInput': return this.pdbInput;
     }
   }
 

@@ -165,8 +165,11 @@ export class ConfinedSpaceXR {
     this.panels = new UIPanelManager(this.camera, this.scene);
     this.panels.onQuickLoadSelect = (id: string) => {
       this.loadPdbId(id);
-      // close panel and restore radial menu
-      this.panels.toggle('quickLoad');
+      // close whichever panel was open
+      const pdbPanel = (this.panels as any).getPdbInputPanel?.();
+      if (pdbPanel && pdbPanel.object3d.visible) this.panels.toggle('pdbInput');
+      if (this.quickLoad.object3d.visible) this.panels.toggle('quickLoad');
+      // restore wrist menu
       this.menuVisible = true;
       this.menu.object3d.visible = true;
     };
@@ -235,7 +238,7 @@ export class ConfinedSpaceXR {
     this.menu.setAction('Visuals', () => this.cycleRepresentation());
     this.menu.setAction('Load', () => {
       if (this.renderer.xr.isPresenting) {
-        const opened = this.panels.toggle('quickLoad');
+        const opened = this.panels.toggle('pdbInput');
         this.menuVisible = !opened;
         this.menu.object3d.visible = this.menuVisible;
       } else {
@@ -268,12 +271,22 @@ export class ConfinedSpaceXR {
       this.moleculeGroup = group;
       this.atoms = atoms;
       this.repIndex = 0;
-      group.position.set(0, 1, 0); // atop pedestal
-      // auto-fit height to ~1 unit
-      const bbox = new THREE.Box3().setFromObject(group);
+      // 1) Uniformly scale so the molecule fits within ~1 unit height.
+      let bbox = new THREE.Box3().setFromObject(group);
       const height = bbox.max.y - bbox.min.y;
       this.moleculeScale = height > 0 ? 1 / height : 1;
-      group.scale.set(this.moleculeScale, this.moleculeScale, this.moleculeScale);
+      group.scale.setScalar(this.moleculeScale);
+
+      // 2) Recompute bounds after scaling to obtain accurate center/min values.
+      group.updateMatrixWorld(true);
+      bbox = new THREE.Box3().setFromObject(group);
+      const center = new THREE.Vector3();
+      bbox.getCenter(center);
+      const minY = bbox.min.y;
+
+      // 3) Position so X/Z center aligns with world origin and base sits at y=1 (pedestal top)
+      group.position.set(-center.x, 1 - minY, -center.z);
+
       this.scene.add(group);
       console.log(`Loaded ${pdb}`);
     } catch (err) {
@@ -353,9 +366,9 @@ export class ConfinedSpaceXR {
       grip.add(controllerModelFactory.createControllerModel(grip));
       this.userRig.add(grip);
       controller.addEventListener('selectstart', () => {
-        if (this.quickLoad.object3d.visible) {
-          // perform selection and then restore radial menu visibility
-          this.quickLoad.select();
+        // If any panel is open that uses select(), forward to panel manager first
+        if (this.panels.handleSelect()) {
+          // panel consumed or closed; restore menu
           this.menuVisible = true;
           this.menu.object3d.visible = true;
         } else if (this.menuVisible) {
@@ -621,7 +634,13 @@ export class ConfinedSpaceXR {
     const items = [
       { label: 'Info',   action: () => console.log('Info (todo)') },
       { label: 'Center', action: () => this.camera.lookAt(worldPos) },
-      { label: 'Hide',   action: () => {/* future hide implementation */} },
+      { label: 'Hide',   action: () => {
+        if (this.moleculeGroup) {
+          this.scene.remove(this.moleculeGroup);
+          this.moleculeGroup = undefined as any;
+          this.atoms = undefined as any;
+        }
+      } },
     ];
     // @ts-ignore – accept plain object array as MenuItem[]
     this.contextMenu = new RadialMenu(items);

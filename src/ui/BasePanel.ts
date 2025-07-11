@@ -7,6 +7,7 @@ import * as THREE from 'three';
 export class BasePanel {
   object3d: THREE.Mesh;
   private closeButton: THREE.Mesh;
+  private hoverClose = false;
   // optional callback when close button pressed
   public onClose: () => void = () => this.hide();
 
@@ -48,11 +49,21 @@ export class BasePanel {
     this.object3d.visible = !this.object3d.visible;
   }
 
-  /** basic pointer check for close button */
+  /** Update hover state for close button each frame. */
   handlePointer(raycaster: THREE.Raycaster) {
     const its = raycaster.intersectObject(this.closeButton, false);
-    if (its.length) {
+    // store hover state to be consumed on click
+    this.hoverClose = its.length > 0;
+    // simple visual feedback by slightly increasing opacity when hovered
+    (this.closeButton.material as THREE.MeshBasicMaterial).opacity = this.hoverClose ? 1 : 0.8;
+  }
+
+  /** Should be called on controller/ mouse click. Returns true if the panel handled the click (i.e. close button). */
+  select(): boolean {
+    if (this.hoverClose) {
       this.onClose();
+      return true;
     }
+    return false;
   }
 }

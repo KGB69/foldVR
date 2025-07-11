@@ -67,15 +67,23 @@ export class QuickLoadPanel extends BasePanel {
     }
   }
 
-  select() {
-    // If no hover, treat as cancel/close
+  /**
+   * Called on controller click. First gives base panel a chance to handle close
+   * button. Returns true if event was consumed.
+   */
+  select(): boolean {
+    // allow base panel close handling first
+    if (super.select()) return true;
+
+    // If no hover, just close the panel
     if (this.hoverIndex === -1) {
       this.hide();
-      return;
+      return true;
     }
-    if (this.hoverIndex !== -1) {
-      const id = this.entries[this.hoverIndex];
-      this.onSelect(id);
-    }
+
+    // Load selected entry
+    const id = this.entries[this.hoverIndex];
+    this.onSelect(id);
+    return true;
   }
 }
