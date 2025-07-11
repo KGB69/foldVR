@@ -112,7 +112,7 @@ export class PdbInputPanel extends BasePanel {
     const ctx = canvas.getContext('2d')!;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#fff';
-    ctx.font = '48px sans-serif';
+    ctx.font = '80px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(txt, canvas.width / 2, canvas.height / 2);
@@ -121,11 +121,11 @@ export class PdbInputPanel extends BasePanel {
 
   private makeTextSprite(text: string, w: number, h: number): THREE.Sprite {
     const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 128;
+    canvas.width = 512;
+    canvas.height = 256;
     const ctx = canvas.getContext('2d')!;
     ctx.fillStyle = '#fff';
-    ctx.font = '48px sans-serif';
+    ctx.font = '80px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(text, canvas.width / 2, canvas.height / 2);

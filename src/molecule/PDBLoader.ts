@@ -106,10 +106,14 @@ export async function loadPDB(id: string): Promise<{ atoms: Atom[]; group: THREE
     atom.y /= 10;
     atom.z /= 10;
   }
-  const group = createBallStick(atoms);
-  const box = new THREE.Box3().setFromObject(group);
-  const center = box.getCenter(new THREE.Vector3());
-  group.position.sub(center);
+  let group: THREE.Group;
+  // Use a lightweight wireframe representation for very large structures
+  if (atoms.length > 3000) {
+    group = createWireframe(atoms);
+  } else {
+    group = createBallStick(atoms);
+  }
+  // Centering & placement handled by ConfinedSpaceXR.loadPdbId
   return { atoms, group };
 }
 

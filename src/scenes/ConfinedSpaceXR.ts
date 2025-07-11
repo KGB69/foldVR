@@ -271,7 +271,11 @@ export class ConfinedSpaceXR {
       this.moleculeGroup = group;
       this.atoms = atoms;
       this.repIndex = 0;
-      // 1) Uniformly scale so the molecule fits within ~1 unit height.
+
+    // reset any prior offset so centering is handled consistently
+    group.position.set(0, 0, 0);
+
+    // 1) Uniformly scale so the molecule fits within ~1 unit height.
       let bbox = new THREE.Box3().setFromObject(group);
       const height = bbox.max.y - bbox.min.y;
       this.moleculeScale = height > 0 ? 1 / height : 1;
@@ -456,6 +460,11 @@ export class ConfinedSpaceXR {
     const delta = this.clock.getDelta();
     // update orbit controls if enabled
     if (this.useOrbit) this.orbit.update();
+
+  // subtle rotation animation for the loaded molecule
+  if (this.moleculeGroup) {
+    this.moleculeGroup.rotation.y += 0.2 * delta;
+  }
 
     if (this.menuVisible) {
       this.menu.update(delta);

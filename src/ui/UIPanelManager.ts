@@ -71,7 +71,8 @@ export class UIPanelManager {
     this.quickLoad = new QuickLoadPanel(['1CRN', '1UBQ', '2PTL', '1STP', '2F4B']);
     this.quickLoad.onSelect = (id: string) => this.onQuickLoadSelect(id);
 
-    this.pdbInput = new PdbInputPanel();
+    // Larger width & row height for better VR legibility
+    this.pdbInput = new PdbInputPanel(1.2, 0.15);
     this.pdbInput.onLoad = (id: string) => this.onQuickLoadSelect(id);
 
     // add to scene & hide by default
