@@ -54,6 +54,13 @@ export class ConfinedSpaceXR {
   private debugTimer = 0;
   private userRig!: THREE.Group;
 
+  // context-sensitive radial menu (right controller trigger long-press)
+  private rightController?: THREE.Object3D;
+  private triggerHeld = false;
+  private triggerHoldDuration = 0;
+  private contextMenu?: RadialMenu;
+  private contextMenuVisible = false;
+
   // movement keys
   private keys = { forward: false, back: false, left: false, right: false };
 
@@ -328,6 +335,10 @@ export class ConfinedSpaceXR {
     const controllerModelFactory = new XRControllerModelFactory();
     for (let i = 0; i < 2; i++) {
       const controller = this.renderer.xr.getController(i);
+      // corresponding grip and visual model
+      const grip = this.renderer.xr.getControllerGrip(i);
+      grip.add(controllerModelFactory.createControllerModel(grip));
+      this.userRig.add(grip);
       controller.addEventListener('selectstart', () => {
         if (this.quickLoad.object3d.visible) {
           // perform selection and then restore radial menu visibility
@@ -337,11 +348,30 @@ export class ConfinedSpaceXR {
         } else if (this.menuVisible) {
           this.menu.select();
         }
+
+        // start long-press timer for right-hand context menu
+        if (controller === this.rightController) {
+          this.triggerHeld = true;
+          this.triggerHoldDuration = 0;
+        }
         // haptic pulse
         const input = (controller as any).inputSource as XRInputSource | undefined;
         const gamepad = input?.gamepad;
         const haptic = gamepad?.hapticActuators?.[0];
         haptic?.pulse?.(0.5, 100);
+      });
+      // trigger release – finish or cancel context menu
+      controller.addEventListener('selectend', () => {
+        if (controller === this.rightController) {
+          if (this.contextMenuVisible && this.contextMenu) {
+            this.contextMenu.select();
+            this.scene.remove(this.contextMenu.object3d);
+            this.contextMenu = undefined;
+            this.contextMenuVisible = false;
+          }
+          this.triggerHeld = false;
+          this.triggerHoldDuration = 0;
+        }
       });
       controller.addEventListener('connected', (event: any) => {
         controller.userData.inputSource = event.data;
@@ -356,6 +386,8 @@ export class ConfinedSpaceXR {
           this.menu.object3d.visible = false;
           this.menu.setOpacity(0);
           this.menuVisible = false;
+        } else if (event.data.handedness === 'right') {
+          this.rightController = controller;
         }
       });
       // wrist-watch style show/hide using grip squeeze
@@ -387,9 +419,7 @@ export class ConfinedSpaceXR {
       controller.add(line);
       this.userRig.add(controller);
 
-      const grip = this.renderer.xr.getControllerGrip(i);
-      grip.add(controllerModelFactory.createControllerModel(grip));
-      this.userRig.add(grip);
+      
 
       this.controllers.push(controller);
     }
@@ -402,6 +432,34 @@ export class ConfinedSpaceXR {
 
     if (this.menuVisible) {
       this.menu.update(delta);
+    }
+
+    // detect right trigger long-press for context menu
+    if (this.rightController && this.triggerHeld) {
+      const src = this.rightController.userData.inputSource as XRInputSource | undefined;
+      const pressed = src?.gamepad?.buttons?.[0]?.pressed;
+      if (pressed) {
+        this.triggerHoldDuration += delta;
+        const HOLD_TIME = 0.4;
+        if (!this.contextMenuVisible && this.triggerHoldDuration > HOLD_TIME) {
+          // perform raycast from right controller
+          const origin = new THREE.Vector3();
+          this.rightController.getWorldPosition(origin);
+          const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(this.rightController.getWorldQuaternion(new THREE.Quaternion()));
+          this.raycaster.ray.origin.copy(origin);
+          this.raycaster.ray.direction.copy(dir);
+          let point = origin.clone().add(dir.multiplyScalar(1)); // default 1 m ahead
+          if (this.moleculeGroup) {
+            const its = this.raycaster.intersectObjects([this.moleculeGroup], true);
+            if (its.length) point = its[0].point;
+          }
+          this.showContextMenu(point);
+        }
+      } else {
+        // trigger released before hold threshold
+        this.triggerHeld = false;
+        this.triggerHoldDuration = 0;
+      }
     }
     // Disabled automatic facing to avoid disorienting yaw spin while moving
     // this.menu.object3d.lookAt(this.camera.position);
@@ -430,6 +488,9 @@ export class ConfinedSpaceXR {
       this.menu.handlePointer(this.raycaster);
       if (this.quickLoad && this.quickLoad.object3d.visible) {
         this.quickLoad.handlePointer(this.raycaster);
+      if (this.contextMenuVisible && this.contextMenu) {
+        this.contextMenu.handlePointer(this.raycaster);
+      }
       }
       // controller pointers (only when in XR)
       if (this.renderer.xr.isPresenting) {
@@ -442,6 +503,9 @@ export class ConfinedSpaceXR {
           this.menu.handlePointer(this.raycaster);
       if (this.quickLoad && this.quickLoad.object3d.visible) {
         this.quickLoad.handlePointer(this.raycaster);
+      if (this.contextMenuVisible && this.contextMenu) {
+        this.contextMenu.handlePointer(this.raycaster);
+      }
       }
         }
       }
@@ -466,6 +530,9 @@ export class ConfinedSpaceXR {
         this.menu.handlePointer(this.raycaster);
       if (this.quickLoad && this.quickLoad.object3d.visible) {
         this.quickLoad.handlePointer(this.raycaster);
+      if (this.contextMenuVisible && this.contextMenu) {
+        this.contextMenu.handlePointer(this.raycaster);
+      }
       }
           // read stick axes
           const src = ctrl.userData.inputSource as XRInputSource | undefined;
@@ -519,7 +586,32 @@ export class ConfinedSpaceXR {
           }
         }
       }
+    if (this.contextMenuVisible && this.contextMenu) {
+      this.contextMenu.object3d.lookAt(this.camera.position);
+    }
     this.renderer.render(this.scene, this.camera);
+  }
+
+  /**
+   * Spawn context-sensitive radial menu at the specified world position.
+   */
+  private showContextMenu(worldPos: THREE.Vector3) {
+    // remove any previous context menu
+    if (this.contextMenu) {
+      this.scene.remove(this.contextMenu.object3d);
+    }
+    // TODO: build real context-aware items. Placeholder actions for phase-1.
+    const items = [
+      { label: 'Info',   action: () => console.log('Info (todo)') },
+      { label: 'Center', action: () => this.camera.lookAt(worldPos) },
+      { label: 'Hide',   action: () => {/* future hide implementation */} },
+    ];
+    // @ts-ignore – accept plain object array as MenuItem[]
+    this.contextMenu = new RadialMenu(items);
+    this.contextMenu.object3d.position.copy(worldPos);
+    this.contextMenu.object3d.lookAt(this.camera.position);
+    this.scene.add(this.contextMenu.object3d);
+    this.contextMenuVisible = true;
   }
 
   private onResize() {

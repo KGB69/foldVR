@@ -12,14 +12,19 @@ export class RadialMenu {
   private sprites: THREE.Sprite[] = [];
   private wedges: THREE.Mesh[] = [];
 
-  constructor() {
+  constructor(items?: MenuItem[]) {
     this.object3d = new THREE.Group();
     this.object3d.position.set(0, 1.4, 0);
 
-    this.addItem('Help', () => console.log('Help clicked'));
-    this.addItem('Settings', () => console.log('Settings clicked'));
-    this.addItem('Load', () => console.log('Load clicked'));
-    this.addItem('Visuals', () => console.log('Visuals clicked'));
+    if (items && items.length) {
+      for (const it of items) this.addItem(it.label, it.action);
+    } else {
+      // default wrist menu items
+      this.addItem('Help', () => console.log('Help clicked'));
+      this.addItem('Settings', () => console.log('Settings clicked'));
+      this.addItem('Load', () => console.log('Load clicked'));
+      this.addItem('Visuals', () => console.log('Visuals clicked'));
+    }
 
     this.buildMesh();
   }
@@ -121,5 +126,20 @@ export class RadialMenu {
       const item = this.items[this.hoverIndex];
       item.action();
     }
+  }
+
+  /**
+   * Replace menu items and rebuild geometry.
+   */
+  setItems(items: MenuItem[]) {
+    // clear previous children
+    for (const w of this.wedges) this.object3d.remove(w);
+    for (const s of this.sprites) this.object3d.remove(s);
+    this.wedges = [];
+    this.sprites = [];
+    this.items = [];
+    for (const it of items) this.addItem(it.label, it.action);
+    this.hoverIndex = -1;
+    this.buildMesh();
   }
 }
