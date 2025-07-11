@@ -8,7 +8,8 @@ import { BasePanel } from './BasePanel';
  */
 export class TextPanel extends BasePanel {
   constructor(lines: string[], width = 1.2, height = 0.7) {
-    super(width, height, 0xffffff);
+    // unified dark theme panel colour
+    super(width, height, 0x333333);
 
     // build canvas
     const canvas = document.createElement('canvas');

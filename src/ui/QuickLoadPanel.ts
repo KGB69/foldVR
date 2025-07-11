@@ -8,7 +8,8 @@ export class QuickLoadPanel extends BasePanel {
   onSelect: (id: string) => void = () => {};
 
   constructor(ids: string[], width = 0.8, rowHeight = 0.12) {
-    super(width, ids.length * rowHeight + 0.1, 0x003355);
+    // unified dark theme
+    super(width, ids.length * rowHeight + 0.1, 0x333333);
     this.entries = ids;
 
     const yStart = (ids.length - 1) * rowHeight * 0.5;
@@ -16,7 +17,7 @@ export class QuickLoadPanel extends BasePanel {
     ids.forEach((id, i) => {
       // button plane
       const geom = new THREE.PlaneGeometry(width - 0.1, rowHeight - 0.02);
-      const mat = new THREE.MeshBasicMaterial({ color: 0x225577, side: THREE.DoubleSide });
+      const mat = new THREE.MeshBasicMaterial({ color: 0x555555, side: THREE.DoubleSide });
       const mesh = new THREE.Mesh(geom, mat);
       mesh.position.set(0, yStart - i * rowHeight, 0.01); // slightly in front
       mesh.userData.index = i;
@@ -56,15 +57,20 @@ export class QuickLoadPanel extends BasePanel {
   private setHover(idx: number) {
     if (this.hoverIndex === idx) return;
     if (this.hoverIndex !== -1) {
-      (this.buttons[this.hoverIndex].material as THREE.MeshBasicMaterial).color.set(0x225577);
+      (this.buttons[this.hoverIndex].material as THREE.MeshBasicMaterial).color.set(0x555555);
     }
     this.hoverIndex = idx;
     if (this.hoverIndex !== -1) {
-      (this.buttons[this.hoverIndex].material as THREE.MeshBasicMaterial).color.set(0x4488aa);
+      (this.buttons[this.hoverIndex].material as THREE.MeshBasicMaterial).color.set(0x888888);
     }
   }
 
   select() {
+    // If no hover, treat as cancel/close
+    if (this.hoverIndex === -1) {
+      this.hide();
+      return;
+    }
     if (this.hoverIndex !== -1) {
       const id = this.entries[this.hoverIndex];
       this.onSelect(id);

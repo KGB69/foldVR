@@ -1,6 +1,6 @@
 # FoldVR – Project Progress Mind-Map
 
-_Last updated: 2025-07-11 10:59 (UTC+3)_
+_Last updated: 2025-07-11 12:31 (UTC+3)_
 
 ## 1. Vision
 Create an immersive, performant WebXR molecular viewer with intuitive, wrist-anchored UI on Oculus Quest 3.
@@ -20,6 +20,9 @@ Create an immersive, performant WebXR molecular viewer with intuitive, wrist-anc
   - Scaled menu to 80 % for less screen real-estate.
 - **Smooth representation transition**
   - Visual style switch uses scale fades.
+- **UIPanelManager extraction & integration** _(branch: feature/uipanel-manager)_
+  - All overlay UI panels managed in dedicated class.
+  - ConfinedSpaceXR cleaned & build green.
 
 ---
 

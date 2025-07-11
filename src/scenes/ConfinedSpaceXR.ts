@@ -4,9 +4,8 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls';
 import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory';
 import { RadialMenu } from '../ui/RadialMenu';
-import { BasePanel } from '../ui/BasePanel';
-import { TextPanel } from '../ui/TextPanel';
 import { QuickLoadPanel } from '../ui/QuickLoadPanel';
+import { UIPanelManager } from '../ui/UIPanelManager';
 import { loadPDB, Atom, createBallStick, createSpaceFill, createWireframe, createTransparentSurface } from '../molecule/PDBLoader';
 import { LoadOverlay } from '../ui/LoadOverlay';
 
@@ -22,11 +21,10 @@ export class ConfinedSpaceXR {
   private menuVisible = true;
   private loadOverlay!: LoadOverlay;
 
-  // panels
-  private helpPanel!: BasePanel;
-  private settingsPanel!: BasePanel;
-  private visPanel!: BasePanel;
-  private quickLoad!: QuickLoadPanel;
+  // unified UI panel manager
+  private panels!: UIPanelManager;
+  // convenience getter for quick-load panel
+  private get quickLoad(): QuickLoadPanel { return this.panels.getQuickLoadPanel(); }
   // left-hand references for "watch" radial menu
   private leftController?: THREE.Object3D;
   private leftGrip?: THREE.Object3D;
@@ -163,27 +161,44 @@ export class ConfinedSpaceXR {
     this.menu.object3d.position.set(0, 0.07, -0.10); // default offset when anchored to wrist
     this.userRig.add(this.menu.object3d); // temporary parent until left grip detected
 
-    // panels (initially hidden)
-    this.helpPanel = new TextPanel([
+    // initialise panel manager
+    this.panels = new UIPanelManager(this.camera, this.scene);
+    this.panels.onQuickLoadSelect = (id: string) => {
+      this.loadPdbId(id);
+      // close panel and restore radial menu
+      this.panels.toggle('quickLoad');
+      this.menuVisible = true;
+      this.menu.object3d.visible = true;
+    };
+
+    // Panels are now managed by UIPanelManager
+    /*([
       'WebXR Molecule Viewer',
       '',
-      'M  : toggle radial menu',
-      'T  : toggle orbit/walk',
-      'WASD: move (walk mode)',
-      'Mouse click: select menu item',
+      'Left Controller:',
+      '  • Thumb-stick  – highlight wrist menu',
+      '  • Grip         – show/hide wrist menu',
       '',
-      'Use the Load menu to fetch a PDB',
-      'Use Visuals to change style',
+      'Right Controller:',
+      '  • Trigger tap  – select',
+      '  • Trigger hold – context menu',
+      '',
+      'Radial Menu items:',
+      '  Help, Settings, Visuals, Load',
     ]);
     this.helpPanel.object3d.position.set(0, 1.6, -1.5);
     this.helpPanel.hide();
     this.scene.add(this.helpPanel.object3d);
 
     this.settingsPanel = new TextPanel([
-      'Settings (coming soon)',
+      'Settings',
       '',
-      '- Orbit vs Walk: press T',
-      '- Menu opacity and scale TBD',
+      'Locomotion:',
+      '  T  – toggle Orbit / Walk (desktop only)',
+      '',
+      'Coming soon:',
+      '  • Colour presets',
+      '  • Molecule auto-scale',
     ]);
     this.settingsPanel.object3d.position.set(0, 1.6, -1.5);
     this.settingsPanel.hide();
@@ -201,13 +216,9 @@ export class ConfinedSpaceXR {
     ]);
     this.visPanel.object3d.position.set(0, 1.6, -1.5);
     this.visPanel.hide();
-    this.scene.add(this.visPanel.object3d);
+    */
 
-    // quick load panel with preset PDB IDs
-    this.quickLoad = new QuickLoadPanel(['1CRN','2POR','5PTI','4HHB','1A4W']);
-    this.quickLoad.hide();
-    this.quickLoad.onSelect = (id:string)=>{ this.loadPdbId(id); this.quickLoad.hide(); };
-    this.scene.add(this.quickLoad.object3d);
+    
 
     // HTML overlay for molecule loading
     this.loadOverlay = new LoadOverlay();
@@ -218,13 +229,15 @@ export class ConfinedSpaceXR {
       if (e.code === 'KeyM') this.toggleMenu();
     });
 
-    // link menu actions
-    this.menu.setAction('Help', () => this.togglePanel(this.helpPanel));
-    this.menu.setAction('Settings', () => this.togglePanel(this.settingsPanel));
+    // link menu actions using panel manager
+    this.menu.setAction('Help', () => this.panels.toggle('help'));
+    this.menu.setAction('Settings', () => this.panels.toggle('settings'));
     this.menu.setAction('Visuals', () => this.cycleRepresentation());
     this.menu.setAction('Load', () => {
       if (this.renderer.xr.isPresenting) {
-        this.togglePanel(this.quickLoad);
+        const opened = this.panels.toggle('quickLoad');
+        this.menuVisible = !opened;
+        this.menu.object3d.visible = this.menuVisible;
       } else {
         this.loadOverlay.show();
       }
@@ -287,7 +300,7 @@ export class ConfinedSpaceXR {
     this.moleculeGroup = newGroup;
   }
 
-  private placePanel(panel: BasePanel) {
+/*
     // position panel a fixed distance in front of camera, facing the camera
     const distance = 1.5;
     const dir = new THREE.Vector3();
@@ -298,7 +311,7 @@ export class ConfinedSpaceXR {
 
   }
 
-  private togglePanel(panel: BasePanel) {
+  // togglePanel removed in favour of UIPanelManagerpanel: BasePanel) {
   const isQuick = panel === this.quickLoad;
     const willOpen = !panel.object3d.visible;
     // hide all panels first
@@ -322,7 +335,7 @@ export class ConfinedSpaceXR {
       this.menu.object3d.visible = true;
     }
   }
-}
+*/
 
   // keyboard toggle kept for desktop testing; does not affect wrist logic
   private toggleMenu() {
@@ -426,6 +439,7 @@ export class ConfinedSpaceXR {
   }
 
   private animate() {
+  this.panels.update();
     const delta = this.clock.getDelta();
     // update orbit controls if enabled
     if (this.useOrbit) this.orbit.update();
@@ -614,7 +628,18 @@ export class ConfinedSpaceXR {
     this.contextMenuVisible = true;
   }
 
-  private onResize() {
+/* obsolete helper removed
+
+  
+    if (p.object3d.visible) this.placePanel(p);
+  };
+  update(this.helpPanel);
+  update(this.settingsPanel);
+  update(this.visPanel);
+  
+*/
+
+private onResize() {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
