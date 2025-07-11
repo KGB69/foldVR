@@ -158,7 +158,7 @@ export class ConfinedSpaceXR {
     if (this.menu.object3d.parent) {
       this.menu.object3d.parent.remove(this.menu.object3d);
     }
-    this.menu.object3d.position.set(0, 0.07, -0.10); // default offset when anchored to wrist
+    this.menu.object3d.position.set(0, 0.07, -0.15); // default offset when anchored to wrist
     this.userRig.add(this.menu.object3d); // temporary parent until left grip detected
 
     // initialise panel manager
@@ -395,7 +395,7 @@ export class ConfinedSpaceXR {
           // move menu to wrist
           if (this.menu.object3d.parent) this.menu.object3d.parent.remove(this.menu.object3d);
           this.leftGrip.add(this.menu.object3d);
-          this.menu.object3d.position.set(0, 0.07, -0.10);
+          this.menu.object3d.position.set(0, 0.07, -0.15);
           this.menu.object3d.visible = false;
           this.menu.setOpacity(0);
           this.menuVisible = false;
@@ -500,6 +500,7 @@ export class ConfinedSpaceXR {
       // mouse pointer
       this.raycaster.setFromCamera(this.mouse, this.camera);
       this.menu.handlePointer(this.raycaster);
+      this.panels.handlePointer(this.raycaster);
       if (this.quickLoad && this.quickLoad.object3d.visible) {
         this.quickLoad.handlePointer(this.raycaster);
       if (this.contextMenuVisible && this.contextMenu) {
@@ -515,6 +516,7 @@ export class ConfinedSpaceXR {
           this.raycaster.ray.origin.copy(origin);
           this.raycaster.ray.direction.copy(dir);
           this.menu.handlePointer(this.raycaster);
+      this.panels.handlePointer(this.raycaster);
       if (this.quickLoad && this.quickLoad.object3d.visible) {
         this.quickLoad.handlePointer(this.raycaster);
       if (this.contextMenuVisible && this.contextMenu) {
@@ -542,6 +544,7 @@ export class ConfinedSpaceXR {
         this.raycaster.ray.origin.copy(origin);
         this.raycaster.ray.direction.copy(dir);
         this.menu.handlePointer(this.raycaster);
+      this.panels.handlePointer(this.raycaster);
       if (this.quickLoad && this.quickLoad.object3d.visible) {
         this.quickLoad.handlePointer(this.raycaster);
       if (this.contextMenuVisible && this.contextMenu) {

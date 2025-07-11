@@ -97,6 +97,15 @@ export class UIPanelManager {
     });
   }
 
+  /** Forward pointer ray to whichever panel is visible (for close btn & hover). */
+  handlePointer(raycaster: THREE.Raycaster) {
+    [this.helpPanel, this.settingsPanel, this.visPanel, this.quickLoad].forEach(p => {
+      if (p.object3d.visible && (p as any).handlePointer) {
+        (p as any).handlePointer(raycaster);
+      }
+    });
+  }
+
   getQuickLoadPanel(): QuickLoadPanel {
     return this.quickLoad;
   }
@@ -113,7 +122,7 @@ export class UIPanelManager {
 
   /** Position panel a fixed distance in front of the camera. */
   private placePanel(panel: BasePanel) {
-    const distance = 1.5;
+    const distance = 1.0;
     const dir = new THREE.Vector3();
     this.camera.getWorldDirection(dir);
     const pos = this.camera.position.clone().add(dir.multiplyScalar(distance));

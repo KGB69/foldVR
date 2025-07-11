@@ -6,6 +6,9 @@ import * as THREE from 'three';
  */
 export class BasePanel {
   object3d: THREE.Mesh;
+  private closeButton: THREE.Mesh;
+  // optional callback when close button pressed
+  public onClose: () => void = () => this.hide();
 
   constructor(width = 1.2, height = 0.7, color = 0x333333) {
     const geom = new THREE.PlaneGeometry(width, height);
@@ -13,6 +16,24 @@ export class BasePanel {
     this.object3d = new THREE.Mesh(geom, mat);
     // tilt slightly toward camera
     this.object3d.rotation.x = -0.2;
+
+    /* --- close button --- */
+    const btnSize = 0.12;
+    const btnGeom = new THREE.PlaneGeometry(btnSize, btnSize);
+    // draw "X" onto canvas
+    const cvs = document.createElement('canvas');
+    cvs.width = 64; cvs.height = 64;
+    const ctx = cvs.getContext('2d')!;
+    ctx.fillStyle = '#222'; ctx.fillRect(0,0,64,64);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(16,16); ctx.lineTo(48,48); ctx.moveTo(48,16); ctx.lineTo(16,48); ctx.stroke();
+    const btnTex = new THREE.CanvasTexture(cvs);
+    const btnMat = new THREE.MeshBasicMaterial({ map: btnTex, transparent: true });
+    this.closeButton = new THREE.Mesh(btnGeom, btnMat);
+    // position top-right (local space)
+    this.closeButton.position.set(width/2 - btnSize/2 - 0.05, height/2 - btnSize/2 - 0.05, 0.02);
+    this.closeButton.name = 'close';
+    this.object3d.add(this.closeButton);
   }
 
   show() {
@@ -25,5 +46,13 @@ export class BasePanel {
 
   toggle() {
     this.object3d.visible = !this.object3d.visible;
+  }
+
+  /** basic pointer check for close button */
+  handlePointer(raycaster: THREE.Raycaster) {
+    const its = raycaster.intersectObject(this.closeButton, false);
+    if (its.length) {
+      this.onClose();
+    }
   }
 }

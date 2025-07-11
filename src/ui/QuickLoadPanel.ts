@@ -45,6 +45,8 @@ export class QuickLoadPanel extends BasePanel {
   }
 
   handlePointer(raycaster: THREE.Raycaster) {
+    // check close button first
+    super.handlePointer(raycaster);
     const intersects = raycaster.intersectObjects(this.buttons, false);
     if (intersects.length) {
       const idx = intersects[0].object.userData.index as number;
