@@ -59,6 +59,23 @@ export class ConfinedSpaceXR {
   private contextMenu?: RadialMenu;
   private contextMenuVisible = false;
 
+  /** Dispose geometries & materials of a molecule group to free GPU memory. */
+  private disposeGroup(group: THREE.Group) {
+    group.traverse((obj) => {
+      if ((obj as THREE.Mesh).isMesh) {
+        const mesh = obj as THREE.Mesh;
+        mesh.geometry.dispose();
+        if (Array.isArray(mesh.material)) {
+          mesh.material.forEach((m) => m.dispose());
+        } else {
+          (mesh.material as THREE.Material).dispose();
+        }
+      }
+    });
+    // flush internal Three.js caches
+    this.renderer.renderLists.dispose();
+  }
+
   // movement keys
   private keys = { forward: false, back: false, left: false, right: false };
 
@@ -267,7 +284,10 @@ export class ConfinedSpaceXR {
     // TODO: validate input
     try {
       const { atoms, group } = await loadPDB(pdb.trim());
-      if (this.moleculeGroup) this.scene.remove(this.moleculeGroup);
+      if (this.moleculeGroup) {
+      this.disposeGroup(this.moleculeGroup);
+      this.scene.remove(this.moleculeGroup);
+    }
       this.moleculeGroup = group;
       this.atoms = atoms;
       this.repIndex = 0;
@@ -645,6 +665,7 @@ export class ConfinedSpaceXR {
       { label: 'Center', action: () => this.camera.lookAt(worldPos) },
       { label: 'Hide',   action: () => {
         if (this.moleculeGroup) {
+          this.disposeGroup(this.moleculeGroup);
           this.scene.remove(this.moleculeGroup);
           this.moleculeGroup = undefined as any;
           this.atoms = undefined as any;

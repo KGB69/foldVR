@@ -107,8 +107,12 @@ export async function loadPDB(id: string): Promise<{ atoms: Atom[]; group: THREE
     atom.z /= 10;
   }
   let group: THREE.Group;
-  // Use a lightweight wireframe representation for very large structures
-  if (atoms.length > 3000) {
+  // Choose representation based on atom count (mobile-friendly thresholds)
+  if (atoms.length > 50000) {
+    throw new Error('Structure too large for mobile-VR viewer');
+  } else if (atoms.length > 20000) {
+    group = createPointCloud(atoms);
+  } else if (atoms.length > 5000) {
     group = createWireframe(atoms);
   } else {
     group = createBallStick(atoms);
@@ -162,6 +166,29 @@ export function createRibbon(atoms: Atom[]): THREE.Group {
   const material = new THREE.MeshStandardMaterial({ color: 0x00ccff, side: THREE.DoubleSide });
   const mesh = new THREE.Mesh(tubeGeom, material);
   group.add(mesh);
+  return group;
+}
+
+export function createPointCloud(atoms: Atom[]): THREE.Group {
+  const positions = new Float32Array(atoms.length * 3);
+  const colors = new Float32Array(atoms.length * 3);
+  const tmpColor = new THREE.Color();
+  atoms.forEach((a, i) => {
+    positions[3 * i] = a.x;
+    positions[3 * i + 1] = a.y;
+    positions[3 * i + 2] = a.z;
+    tmpColor.setHex(ELEMENT_COLORS[a.element] ?? 0x888888);
+    colors[3 * i] = tmpColor.r;
+    colors[3 * i + 1] = tmpColor.g;
+    colors[3 * i + 2] = tmpColor.b;
+  });
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  const mat = new THREE.PointsMaterial({ size: 0.15, vertexColors: true });
+  const pts = new THREE.Points(geom, mat);
+  const group = new THREE.Group();
+  group.add(pts);
   return group;
 }
 
