@@ -8,6 +8,7 @@ import { QuickLoadPanel } from '../ui/QuickLoadPanel';
 import { UIPanelManager } from '../ui/UIPanelManager';
 import { loadPDB, Atom, createBallStick, createSpaceFill, createWireframe, createTransparentSurface, createRibbon } from '../molecule/PDBLoader';
 import { LoadOverlay } from '../ui/LoadOverlay';
+import { NetworkManager } from '../network/NetworkManager';
 
 export class ConfinedSpaceXR {
   private renderer!: THREE.WebGLRenderer;
@@ -20,6 +21,7 @@ export class ConfinedSpaceXR {
   private clock = new THREE.Clock();
   private menuVisible = true;
   private loadOverlay!: LoadOverlay;
+  private network!: NetworkManager;
 
   // unified UI panel manager
   private panels!: UIPanelManager;
@@ -242,7 +244,8 @@ export class ConfinedSpaceXR {
 
     // HTML overlay for molecule loading
     this.loadOverlay = new LoadOverlay();
-    this.loadOverlay.onLoad = (id) => this.loadPdbId(id);
+    this.network = new NetworkManager(this);
+    this.loadOverlay.onLoad = (id) => this.loadPdbId(id, true);
 
     // keyboard toggle for menu visibility
     window.addEventListener('keydown', (e) => {
@@ -280,7 +283,7 @@ export class ConfinedSpaceXR {
     }
   }
 
-  private async loadPdbId(pdb: string) {
+  public async loadPdbId(pdb: string, broadcast = false) {
     // TODO: validate input
     try {
       const { atoms, group } = await loadPDB(pdb.trim());
@@ -312,6 +315,10 @@ export class ConfinedSpaceXR {
       group.position.set(-center.x, 1 - minY, -center.z);
 
       this.scene.add(group);
+
+    if (broadcast) {
+      this.network.sendMessage(JSON.stringify({ type: 'load', pdbId: pdb }));
+    }
       console.log(`Loaded ${pdb}`);
     } catch (err) {
       console.error(err);

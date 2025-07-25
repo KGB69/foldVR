@@ -1,0 +1,17 @@
+services:
+  # A static site for our front-end
+  - type: web
+    name: vr-molecule-viewer-frontend
+    env: static
+    staticPublishPath: ./dist
+    # The build command for the frontend
+    buildCommand: npm install && npm run build
+
+  # A web service for our WebSocket server
+  - type: web
+    name: vr-molecule-viewer-server
+    env: node
+    plan: free # or your desired plan
+    # The command to start the server
+    startCommand: npm run server
+    healthCheckPath: / # Render requires a health check endpoint
