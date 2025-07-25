@@ -9,7 +9,6 @@
   },
   "dependencies": {
     "molstar": "^3.2.0",
-    "nodemon": "^3.1.2",
     "socket.io": "^4.7.5",
     "three": "^0.168.0",
     "ts-node": "^10.9.2",

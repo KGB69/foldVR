@@ -15,5 +15,6 @@ services:
     # The build command for the server
     buildCommand: npm install
     # The command to start the server
+    # Use the 'start' script from package.json
     startCommand: npm run start
     healthCheckPath: / # Render requires a health check endpoint
