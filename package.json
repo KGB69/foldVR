@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "webpack serve --mode development --open",
     "build": "webpack --mode production",
-    "start": "ts-node server/server.ts"
+    "build:server": "tsc -p tsconfig.server.json",
+    "start": "node dist-server/server.js"
   },
   "dependencies": {
     "molstar": "^3.2.0",
