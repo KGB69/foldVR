@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "webpack serve --mode development --open",
     "build": "webpack --mode production",
-    "server": "nodemon --watch 'server/**/*.ts' --exec 'ts-node' server/server.ts"
+    "start": "ts-node server/server.ts"
   },
   "dependencies": {
     "molstar": "^3.2.0",

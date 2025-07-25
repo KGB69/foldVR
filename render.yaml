@@ -12,6 +12,8 @@ services:
     name: vr-molecule-viewer-server
     env: node
     plan: free # or your desired plan
+    # The build command for the server
+    buildCommand: npm install
     # The command to start the server
-    startCommand: npm run server
+    startCommand: npm run start
     healthCheckPath: / # Render requires a health check endpoint
